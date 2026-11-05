@@ -1,40 +1,34 @@
 package com.makeemsmile.app
 
+import android.content.Context
 import android.content.SharedPreferences
 
-/** Opening jokes for the friend holding the phone. Rotates through all of them before repeating. */
+/**
+ * Opening jokes for the friend holding the phone, read from assets/jokes.txt (one per line,
+ * lines starting with # ignored). Goes through all of them before repeating.
+ */
 object Jokes {
-    private val ALL = listOf(
-        "I bought a book on how to stop procrastinating. I'll start it tomorrow.",
-        "I finally got eight hours of sleep. It only took me three nights.",
-        "My bed is a magic place where I suddenly remember everything I forgot to do.",
-        "The GPS said \"turn around when possible,\" and now I'm questioning all my life choices.",
-        "I'm not lazy. I'm in energy-saving mode, like my phone at 20%.",
-        "My washing machine ate another sock. At this point it's a relationship, not a malfunction.",
-        "My fridge light is the only thing that's excited to see me every single time.",
-        "I named my Wi-Fi \"Hidden Network,\" and my neighbors still keep trying.",
-        "I started a band called Out of Office. We never show up, but everyone gets the message.",
-        "My cat has stared at the same wall for ten minutes. I've never been this scared of a wall.",
-        "I tried to be normal once. Worst two minutes of my life.",
-        "I told my plants about my problems. Now they're dying too.",
-        "My phone battery has outlasted every New Year's resolution I've ever made.",
-        "I don't need a hairstylist. My pillow gives me a new look every morning.",
-        "I'm on a seafood diet. I see food, and I eat it.",
-        "I told my suitcase there will be no vacation this year. Now I'm dealing with emotional baggage.",
-        "I ordered a chicken and an egg online. I'll let you know which comes first.",
-        "I wanted to tell a joke about a broken pencil, but it's pointless.",
-        "Parallel lines have so much in common. It's a shame they'll never meet.",
-        "I'm reading a book about anti-gravity. I can't put it down.",
-        "My diet plan: if no one sees me eat it, it has no calories.",
-        "I used to play piano by ear. Now I use my hands.",
-        "I put my phone on airplane mode, and it still didn't fly.",
-        "My smart watch says I'm sleeping. I'm at work.",
-        "I don't snore. I dream I'm a motorcycle.",
-    )
+    private const val FALLBACK = "I'm not lazy. I'm in energy-saving mode, like my phone at 20%."
+    private var cache: List<String>? = null
 
-    fun next(prefs: SharedPreferences): String {
-        val i = prefs.getInt("joke_index", (ALL.indices).random())
-        prefs.edit().putInt("joke_index", (i + 1) % ALL.size).apply()
-        return ALL[i % ALL.size]
+    private fun all(ctx: Context): List<String> {
+        cache?.let { return it }
+        val list = try {
+            ctx.assets.open("jokes.txt").bufferedReader().readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") }
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val result = list.ifEmpty { listOf(FALLBACK) }
+        cache = result
+        return result
+    }
+
+    fun next(ctx: Context, prefs: SharedPreferences): String {
+        val jokes = all(ctx)
+        val i = prefs.getInt("joke_index", jokes.indices.random()) % jokes.size
+        prefs.edit().putInt("joke_index", (i + 1) % jokes.size).apply()
+        return jokes[i]
     }
 }

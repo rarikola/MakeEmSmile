@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
     private fun showIntro(clearName: Boolean) {
         handler.removeCallbacksAndMessages(null)
         screen = Screen.INTRO
-        introJoke.text = getString(R.string.intro_joke, Jokes.next(prefs))
+        introJoke.text = getString(R.string.intro_joke, Jokes.next(this, prefs))
         if (clearName) nameInput.setText("")
         introGroup.visibility = View.VISIBLE
         roundGroup.visibility = View.GONE
