@@ -5,7 +5,7 @@
     <!-- Intro -->
     <string name="intro_title">You\'ve got 1 minute to make \'em smile.</string>
     <string name="intro_body">Make faces, fart (or fake one), or tell a joke. Here\'s one:</string>
-    <string name="intro_joke">\"%1$s\"</string>
+    <string name="intro_joke">Wanna hear a joke? Here we go…\n\n%1$s</string>
     <string name="intro_tip">Point the camera at the player, so they can\'t see the meters.</string>
     <string name="name_hint">Who\'s playing? (name)</string>
     <string name="default_player">Player %1$d</string>
