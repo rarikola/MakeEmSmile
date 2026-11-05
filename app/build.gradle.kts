@@ -17,7 +17,8 @@ android {
         applicationId = "com.makeemsmile.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Every GitHub build gets a higher number automatically (Google Play requires it to go up).
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "1.0"
     }
 
