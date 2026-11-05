@@ -1,0 +1,73 @@
+name: Build MakeEmSmile
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Works whether the project sits at the top of the repo or one folder down.
+      - name: Find project folder
+        run: |
+          DIR=$(dirname "$(find . -name settings.gradle.kts -not -path './.git/*' | head -n 1)")
+          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "Project folder: $DIR"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Download MediaPipe face model
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL -o app/src/main/assets/face_landmarker.task \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          ls -l app/src/main/assets
+
+      - name: Build test APK (install on your phone)
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MakeEmSmile-test-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+
+      # The Play Store bundle is only built once the signing secrets are added (see README).
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "MES_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "HAS_KEY=true" >> "$GITHUB_ENV"
+            echo "Signing key found."
+          else
+            echo "No signing secrets yet: skipping the Play Store bundle."
+          fi
+
+      - name: Build Play Store bundle
+        if: env.HAS_KEY == 'true'
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          MES_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          MES_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          MES_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle bundleRelease --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          name: MakeEmSmile-play-store-bundle
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/bundle/release/*.aab
