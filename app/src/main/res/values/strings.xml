@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MakeEmSmile</string>
+
+    <!-- Intro -->
+    <string name="intro_title">You\'ve got 1 minute to make \'em smile.</string>
+    <string name="intro_body">Make faces, fart (or fake one), or tell a joke. Here\'s one:</string>
+    <string name="intro_joke">\"%1$s\"</string>
+    <string name="intro_tip">Point the camera at the player, so they can\'t see the meters.</string>
+    <string name="name_hint">Who\'s playing? (name)</string>
+    <string name="default_player">Player %1$d</string>
+    <string name="start">Start</string>
+    <string name="camera_back">Using back camera · switch</string>
+    <string name="camera_front">Using front camera · switch</string>
+
+    <!-- Round -->
+    <string name="baseline">%1$s, relax your face…</string>
+    <string name="baseline_no_face">Can\'t see a face yet.\nPoint the camera at the player.</string>
+    <string name="go">Go! Make \'em smile.</string>
+    <string name="find_face">Find the face!\nThe clock is paused.</string>
+    <string name="almost">almost!</string>
+    <string name="cracked_pill">CRACKED!</string>
+    <string name="bar_boring">boring</string>
+    <string name="bar_smile">smile</string>
+    <string name="bar_laugh">laugh</string>
+    <string name="bar_reaction">reaction</string>
+
+    <!-- Results -->
+    <string name="res_cracked">%1$s cracked at</string>
+    <string name="res_survived">%1$s survived the full minute!</string>
+    <string name="how_sneaky">A sneaky little smile.</string>
+    <string name="how_smile">A proper smile.</string>
+    <string name="how_laugh">Full-on laughing!</string>
+    <string name="how_survived">Stone face. Not a single smile.</string>
+    <plurals name="near_misses">
+        <item quantity="one">%1$d near-miss before that</item>
+        <item quantity="other">%1$d near-misses before that</item>
+    </plurals>
+    <string name="res_image_description">The player\'s face at the end of the round</string>
+    <string name="scoreboard">Scoreboard</string>
+    <string name="board_row">%1$d. %2$s   %3$s %4$s</string>
+    <string name="best_ever">Best ever: %1$s, %2$s</string>
+    <string name="next_player">Next player</string>
+    <string name="rematch">Rematch</string>
+    <string name="share">Share</string>
+    <string name="share_line_cracked">%1$s cracked after</string>
+    <string name="share_line_survived">%1$s didn\'t smile for</string>
+    <string name="share_text_cracked">%1$s lasted %2$s before cracking up. Can you keep a straighter face? #MakeEmSmile</string>
+    <string name="share_text_survived">%1$s survived %2$s without a single smile. Think you can crack them? #MakeEmSmile</string>
+    <string name="share_footer">MakeEmSmile · Android</string>
+
+    <!-- Errors -->
+    <string name="need_camera">MakeEmSmile needs the camera to see the player\'s face.</string>
+    <string name="model_failed">Face tracking couldn\'t start: %1$s</string>
+</resources>
