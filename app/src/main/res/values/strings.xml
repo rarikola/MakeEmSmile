@@ -5,13 +5,15 @@
     <!-- Intro -->
     <string name="intro_title">You\'ve got 1 minute to make \'em smile.</string>
     <string name="intro_body">Make faces, fart (or fake one), or tell a joke. Here\'s one:</string>
-    <string name="intro_joke">Wanna hear a joke? Here we go…\n\n%1$s</string>
-    <string name="intro_tip">Point the camera at the player, so they can\'t see the meters.</string>
     <string name="name_hint">Who\'s playing? (name)</string>
     <string name="default_player">Player %1$d</string>
     <string name="start">Start</string>
-    <string name="camera_back">Using back camera · switch</string>
-    <string name="camera_front">Using front camera · switch</string>
+    <string name="camera_back">Back camera</string>
+    <string name="camera_front">Front camera (testing)</string>
+    <string name="joke_prev">Previous joke</string>
+    <string name="joke_next">Next joke</string>
+    <string name="how_to_play"><b>How to play:</b> point the camera at the player and ask them not to smile for 1 minute.</string>
+    <string name="feedback_link"><u>Whether it sucks 😒, meh 🫤, or not bad 😎, please comment</u></string>
 
     <!-- Round -->
     <string name="baseline">%1$s, relax your face…</string>
@@ -28,8 +30,7 @@
     <!-- Results -->
     <string name="res_cracked">%1$s cracked at</string>
     <string name="res_survived">%1$s survived the full minute!</string>
-    <string name="how_sneaky">A sneaky little smile.</string>
-    <string name="how_smile">A proper smile.</string>
+    <string name="how_smile">A real smile, eyes and all.</string>
     <string name="how_laugh">Full-on laughing!</string>
     <string name="how_survived">Stone face. Not a single smile.</string>
     <plurals name="near_misses">

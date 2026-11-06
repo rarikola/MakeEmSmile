@@ -5,10 +5,12 @@ import android.content.SharedPreferences
 
 /**
  * Opening jokes for the friend holding the phone, read from assets/jokes.txt (one per line,
- * lines starting with # ignored). Goes through all of them before repeating.
+ * lines starting with # ignored). [next] and [previous] browse through them in order, wrapping
+ * around; the position is remembered, so each new round starts on a joke not seen yet.
  */
 object Jokes {
     private const val FALLBACK = "I'm not lazy. I'm in energy-saving mode, like my phone at 20%."
+    private const val KEY = "joke_current"
     private var cache: List<String>? = null
 
     private fun all(ctx: Context): List<String> {
@@ -25,10 +27,17 @@ object Jokes {
         return result
     }
 
-    fun next(ctx: Context, prefs: SharedPreferences): String {
+    private fun move(ctx: Context, prefs: SharedPreferences, step: Int): String {
         val jokes = all(ctx)
-        val i = prefs.getInt("joke_index", jokes.indices.random()) % jokes.size
-        prefs.edit().putInt("joke_index", (i + 1) % jokes.size).apply()
+        val n = jokes.size
+        // First time ever: start somewhere random.
+        val current = prefs.getInt(KEY, jokes.indices.random() - step)
+        val i = ((current + step) % n + n) % n
+        prefs.edit().putInt(KEY, i).apply()
         return jokes[i]
     }
+
+    fun next(ctx: Context, prefs: SharedPreferences) = move(ctx, prefs, +1)
+
+    fun previous(ctx: Context, prefs: SharedPreferences) = move(ctx, prefs, -1)
 }

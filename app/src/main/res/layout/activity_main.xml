@@ -30,14 +30,31 @@
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <TextView
+                <!-- Logo + name. Long-press the logo to switch cameras (hidden, for testing). -->
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="14dp"
-                    android:text="@string/app_name"
-                    android:textColor="#FFFF54"
-                    android:textSize="34sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/logo"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:longClickable="true"
+                        android:src="@drawable/logo" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        android:textColor="#FFD43B"
+                        android:textSize="34sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -65,23 +82,68 @@
                         android:textColor="#DDDDDD"
                         android:textSize="19sp" />
 
-                    <TextView
-                        android:id="@+id/intro_joke"
+                    <!-- Joke with arrows; swiping the joke also works. -->
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
                         android:background="@drawable/bg_joke"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/joke_prev"
+                            android:layout_width="44dp"
+                            android:layout_height="match_parent"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/joke_prev"
+                            android:gravity="center"
+                            android:minHeight="72dp"
+                            android:text="‹"
+                            android:textColor="#FFD43B"
+                            android:textSize="38sp" />
+
+                        <TextView
+                            android:id="@+id/intro_joke"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:lineSpacingExtra="3dp"
+                            android:minHeight="72dp"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp"
+                            android:textColor="#FFFF54"
+                            android:textSize="19sp" />
+
+                        <TextView
+                            android:id="@+id/joke_next"
+                            android:layout_width="44dp"
+                            android:layout_height="match_parent"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/joke_next"
+                            android:gravity="center"
+                            android:minHeight="72dp"
+                            android:text="›"
+                            android:textColor="#FFD43B"
+                            android:textSize="38sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
                         android:gravity="center"
-                        android:lineSpacingExtra="3dp"
-                        android:padding="14dp"
-                        android:textColor="#FFFF54"
-                        android:textSize="19sp" />
+                        android:lineSpacingExtra="2dp"
+                        android:text="@string/how_to_play"
+                        android:textColor="#CCCCCC"
+                        android:textSize="17sp" />
 
                     <EditText
                         android:id="@+id/name_input"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
+                        android:layout_marginTop="14dp"
                         android:autofillHints="name"
                         android:hint="@string/name_hint"
                         android:imeOptions="actionDone"
@@ -99,24 +161,19 @@
                         android:layout_marginTop="14dp"
                         android:text="@string/start"
                         android:textSize="21sp" />
-
-                    <Button
-                        android:id="@+id/flip_camera"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="6dp"
-                        android:textSize="15sp" />
                 </LinearLayout>
 
                 <TextView
+                    android:id="@+id/feedback_link"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="18dp"
+                    android:background="?android:attr/selectableItemBackground"
                     android:gravity="center"
-                    android:text="@string/intro_tip"
-                    android:textColor="#BBBBBB"
-                    android:textSize="15sp" />
+                    android:padding="8dp"
+                    android:text="@string/feedback_link"
+                    android:textColor="#FFD43B"
+                    android:textSize="16sp" />
             </LinearLayout>
         </ScrollView>
 

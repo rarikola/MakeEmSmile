@@ -1,16 +1,21 @@
 package com.makeemsmile.app
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Typeface
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.TypedValue
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
@@ -34,6 +39,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.abs
 import kotlin.math.max
 
 /**
@@ -47,9 +53,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ROUND_MS = 60_000L
         const val BASELINE_MS = 3000L
-        const val ALMOST_LEVEL = 0.15f
-        const val REARM_LEVEL = 0.10f
-        const val CRACK_HOLD_MS = 300L
+        const val CRACK_HOLD_MS = 400L
+        const val FEEDBACK_URL = "https://makeemsmile.app/feedback/"
         const val AFTER_MS = 1000L
     }
 
@@ -62,7 +67,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var introGroup: View
     private lateinit var introJoke: TextView
     private lateinit var nameInput: EditText
-    private lateinit var flipButton: Button
+    private lateinit var logo: View
     private lateinit var roundGroup: View
     private lateinit var clock: TextView
     private lateinit var playerLabel: TextView
@@ -98,7 +103,7 @@ class MainActivity : ComponentActivity() {
     private var lastTick = 0L
     private var crackSince = -1L
     private var crackAt = 0L
-    private var peakAfter = 0f
+    private var peakLevel = ReactionDetector.BORING
     private var nearMisses = 0
     private var armed = true
     private var findingFace = false
@@ -123,7 +128,7 @@ class MainActivity : ComponentActivity() {
         introGroup = findViewById(R.id.intro_group)
         introJoke = findViewById(R.id.intro_joke)
         nameInput = findViewById(R.id.name_input)
-        flipButton = findViewById(R.id.flip_camera)
+        logo = findViewById(R.id.logo)
         roundGroup = findViewById(R.id.round_group)
         clock = findViewById(R.id.clock)
         playerLabel = findViewById(R.id.player_label)
@@ -149,8 +154,6 @@ class MainActivity : ComponentActivity() {
             insets
         }
 
-        backCamera = prefs.getBoolean("back_camera", true)
-        updateFlipLabel()
         cameraExecutor = Executors.newSingleThreadExecutor()
         setUpSound()
 
@@ -158,12 +161,34 @@ class MainActivity : ComponentActivity() {
         nameInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
         }
-        flipButton.setOnClickListener {
+        // Hidden for testing: long-press the logo to switch between back and front camera.
+        // Not saved, so the app always starts with the back camera.
+        logo.setOnLongClickListener {
             backCamera = !backCamera
-            prefs.edit().putBoolean("back_camera", backCamera).apply()
-            updateFlipLabel()
             tracker?.let { rebind(it) }
+            Toast.makeText(this, if (backCamera) R.string.camera_back else R.string.camera_front, Toast.LENGTH_SHORT).show()
+            true
         }
+
+        // Browse jokes with the arrows or by swiping the joke left/right.
+        findViewById<View>(R.id.joke_prev).setOnClickListener { introJoke.text = Jokes.previous(this, prefs) }
+        findViewById<View>(R.id.joke_next).setOnClickListener { introJoke.text = Jokes.next(this, prefs) }
+        val swipe = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                val dx = e2.x - (e1?.x ?: e2.x)
+                if (abs(dx) < dp(40) || abs(velocityX) < abs(velocityY)) return false
+                introJoke.text = if (dx < 0) Jokes.next(this@MainActivity, prefs) else Jokes.previous(this@MainActivity, prefs)
+                return true
+            }
+        })
+        introJoke.setOnTouchListener { v, event ->
+            val handled = swipe.onTouchEvent(event)
+            if (event.action == MotionEvent.ACTION_UP && !handled) v.performClick()
+            handled
+        }
+
+        findViewById<View>(R.id.feedback_link).setOnClickListener { openFeedback() }
         findViewById<Button>(R.id.res_rematch).setOnClickListener { showIntro(clearName = false) }
         findViewById<Button>(R.id.res_next).setOnClickListener { showIntro(clearName = true) }
         findViewById<Button>(R.id.res_share).setOnClickListener { share() }
@@ -187,7 +212,7 @@ class MainActivity : ComponentActivity() {
     private fun showIntro(clearName: Boolean) {
         handler.removeCallbacksAndMessages(null)
         screen = Screen.INTRO
-        introJoke.text = getString(R.string.intro_joke, Jokes.next(this, prefs))
+        introJoke.text = Jokes.next(this, prefs)
         if (clearName) nameInput.setText("")
         introGroup.visibility = View.VISIBLE
         roundGroup.visibility = View.GONE
@@ -203,7 +228,7 @@ class MainActivity : ComponentActivity() {
         lastTick = 0L
         crackSince = -1L
         crackAt = 0L
-        peakAfter = 0f
+        peakLevel = ReactionDetector.BORING
         nearMisses = 0
         armed = true
         findingFace = false
@@ -219,7 +244,7 @@ class MainActivity : ComponentActivity() {
         playerLabel.text = playerName
         clock.text = format(ROUND_MS, countUp = false)
         pill.visibility = View.GONE
-        smileBar.setValue(0f)
+        smileBar.reset()
         emojiBar.setReaction(Reaction.NOTHING)
         runBaseline()
     }
@@ -286,12 +311,12 @@ class MainActivity : ComponentActivity() {
         if (frame != null) lastFrame = frame
 
         detector.update(v, now)
-        val smile = detector.smile
-        smileBar.setValue(smile)
+        val level = detector.level
+        smileBar.setValue(detector.barPos, level)
         emojiBar.setReaction(detector.reaction)
 
         if (screen == Screen.CRACKED) {
-            peakAfter = max(peakAfter, smile)
+            peakLevel = max(peakLevel, level)
             return
         }
 
@@ -299,23 +324,23 @@ class MainActivity : ComponentActivity() {
         val r = detector.reaction
         if (r != Reaction.NOTHING && (timeline.isEmpty() || timeline.last() != r)) timeline.add(r)
 
-        // "almost!" and near-misses.
-        if (smile >= ALMOST_LEVEL && armed) {
+        // "almost!" while a slight smile shows; each new one (after going back to straight) is a near-miss.
+        if (level >= ReactionDetector.SLIGHT && armed) {
             nearMisses++
             armed = false
         }
-        if (smile < REARM_LEVEL) armed = true
-        if (smile >= ALMOST_LEVEL) {
+        if (level == ReactionDetector.BORING) armed = true
+        if (level == ReactionDetector.SLIGHT) {
             pill.text = getString(R.string.almost)
             pill.setBackgroundResource(R.drawable.bg_almost)
             pill.setTextColor(0xFF5A5000.toInt())
             pill.visibility = View.VISIBLE
-        } else {
+        } else if (level == ReactionDetector.BORING) {
             pill.visibility = View.GONE
         }
 
-        // Cracked: into the smile section, held for a moment.
-        if (smile >= ReactionDetector.SMILE_LEVEL) {
+        // Cracked: a real smile (mouth AND eyes), held for a moment.
+        if (level >= ReactionDetector.SMILE) {
             if (crackSince < 0) crackSince = now
             if (now - crackSince >= CRACK_HOLD_MS) {
                 crack(frame)
@@ -334,7 +359,7 @@ class MainActivity : ComponentActivity() {
         crackAt = elapsed
         resultFrame = frame ?: lastFrame
         resultFrameBack = backCamera
-        peakAfter = detector.smile
+        peakLevel = detector.level
         if (nearMisses > 0) nearMisses--   // the crack itself started as an "almost"
         soundPool?.play(crackSound, 1f, 1f, 1, 0, 1f)
         pill.text = getString(R.string.cracked_pill)
@@ -371,9 +396,8 @@ class MainActivity : ComponentActivity() {
         resTime.text = format(lasted, countUp = true)
         val how = when {
             !cracked -> getString(R.string.how_survived)
-            peakAfter >= ReactionDetector.LAUGH_LEVEL -> getString(R.string.how_laugh)
-            peakAfter >= 0.45f -> getString(R.string.how_smile)
-            else -> getString(R.string.how_sneaky)
+            peakLevel >= ReactionDetector.LAUGH -> getString(R.string.how_laugh)
+            else -> getString(R.string.how_smile)
         }
         val misses = if (nearMisses > 0) "\n" + resources.getQuantityString(R.plurals.near_misses, nearMisses, nearMisses) else ""
         resHow.text = how + misses
@@ -382,7 +406,7 @@ class MainActivity : ComponentActivity() {
 
         val end = when {
             !cracked -> Emoji.TROPHY
-            peakAfter >= ReactionDetector.LAUGH_LEVEL -> Emoji.LAUGH + Emoji.BANG
+            peakLevel >= ReactionDetector.LAUGH -> Emoji.LAUGH + Emoji.BANG
             else -> Emoji.SMILE + Emoji.BANG
         }
         lastTimeline = buildTimeline(end)
@@ -441,8 +465,12 @@ class MainActivity : ComponentActivity() {
 
     // ---------------------------------------------------------------- camera
 
-    private fun updateFlipLabel() {
-        flipButton.text = getString(if (backCamera) R.string.camera_back else R.string.camera_front)
+    private fun openFeedback() {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(FEEDBACK_URL)))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, FEEDBACK_URL, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun startCamera() {
@@ -483,7 +511,6 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             // This phone doesn't have that camera; use the other one.
             backCamera = !backCamera
-            updateFlipLabel()
             provider.unbindAll()
             val other = if (backCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
             provider.bindToLifecycle(this, other, preview, analysis)

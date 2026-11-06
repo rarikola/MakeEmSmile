@@ -31,15 +31,38 @@ enum class Reaction(val word: String, private val choices: List<String>) {
 }
 
 /**
- * Turns the player's 52 face values into:
- *  - [smile]: 0 = straight face, about 0.3 = a clear smile, 0.65+ = laughing
- *  - [reaction]: what else the face is doing (skeptical, eye-roll, yawn…)
+ * Turns the player's 52 face values into a smile level, a position on the smile bar, and a reaction.
  * Everything is measured as the change from the player's relaxed face, recorded at round start.
+ *
+ * Smile levels follow how face researchers (FACS) tell smiles apart:
+ *  - SLIGHT: lip corners pulled up a little. Still "boring" on the bar; only triggers "almost!".
+ *  - SMILE:  lip corners clearly up AND smiling eyes (cheeks raised, eyes narrowed). This is a
+ *            real smile, and it means cracked. A polite mouth-only smile doesn't count.
+ *  - LAUGH:  a real smile plus an open mouth and squeezed eyes.
+ * Showing teeth on its own isn't a smile: a stretched mouth (grimace, "eek") pulls the corners
+ * sideways rather than up, so it is subtracted from the corner lift and shows up as a reaction instead.
  */
 class ReactionDetector {
     companion object {
-        const val SMILE_LEVEL = 0.30f
-        const val LAUGH_LEVEL = 0.65f
+        const val BORING = 0
+        const val SLIGHT = 1
+        const val SMILE = 2
+        const val LAUGH = 3
+
+        /** Where each section starts on the bar: boring 45% | smile 35% | laugh 20%. */
+        const val ZONE_SMILE = 0.45f
+        const val ZONE_LAUGH = 0.80f
+
+        private const val SLIGHT_CORNERS = 0.15f
+        private const val SMILE_CORNERS = 0.35f
+        private const val SMILE_EYES = 0.15f
+        private const val LAUGH_CORNERS = 0.45f
+        private const val LAUGH_EYES = 0.20f
+        private const val LAUGH_JAW = 0.25f
+        /** Once a level is reached, it's kept until the face drops below 85% of the entry values. */
+        private const val STAY = 0.85f
+
+        private const val SMOOTHING = 0.35f
         private const val DEBOUNCE_MS = 250L
         private const val DROOP_MS = 800L
     }
@@ -51,7 +74,11 @@ class ReactionDetector {
     private var candidateSince = 0L
     private var droopSince = -1L
 
-    var smile = 0f
+    /** BORING, SLIGHT, SMILE or LAUGH. */
+    var level = BORING
+        private set
+    /** 0..1 across the smile bar. */
+    var barPos = 0f
         private set
     var reaction = Reaction.NOTHING
         private set
@@ -63,7 +90,8 @@ class ReactionDetector {
 
     fun reset() {
         primed = false
-        smile = 0f
+        level = BORING
+        barPos = 0f
         reaction = Reaction.NOTHING
         candidate = Reaction.NOTHING
         candidateSince = 0L
@@ -77,21 +105,44 @@ class ReactionDetector {
 
     private fun both(name: String) = (d(name + "Left") + d(name + "Right")) / 2f
     private fun diff(name: String) = abs(d(name + "Left") - d(name + "Right"))
+    private fun frac(v: Float, from: Float, to: Float) = ((v - from) / (to - from)).coerceIn(0f, 1f)
 
     fun update(face: FloatArray, now: Long) {
-        // Light smoothing so single noisy frames don't flicker the bars.
+        // Smoothing so single noisy frames don't flicker the bars.
         if (!primed) {
             face.copyInto(s)
             primed = true
         } else {
-            for (k in s.indices) s[k] += 0.5f * (face[k] - s[k])
+            for (k in s.indices) s[k] += SMOOTHING * (face[k] - s[k])
         }
 
-        val mouthSmile = both("mouthSmile")
+        // ---- Smile ----
+        val stretch = both("mouthStretch")
+        val corners = both("mouthSmile") - 0.5f * max(0f, stretch - 0.2f)
+        val eyes = max(both("cheekSquint"), 0.8f * both("eyeSquint"))
         val jaw = d("jawOpen")
-        // An open jaw on top of a smile is laughing.
-        smile = max(0f, mouthSmile + if (mouthSmile > 0.2f) 0.5f * max(0f, jaw) else 0f)
 
+        // Hysteresis: entering a level needs the full values, staying needs 85% of them.
+        fun at(lvl: Int) = if (level >= lvl) STAY else 1f
+        val slight = corners >= SLIGHT_CORNERS * at(SLIGHT)
+        val real = corners >= SMILE_CORNERS * at(SMILE) && eyes >= SMILE_EYES * at(SMILE)
+        val laugh = real && corners >= LAUGH_CORNERS * at(LAUGH) && eyes >= LAUGH_EYES * at(LAUGH) && jaw >= LAUGH_JAW * at(LAUGH)
+        level = when {
+            laugh -> LAUGH
+            real -> SMILE
+            slight -> SLIGHT
+            else -> BORING
+        }
+        barPos = when (level) {
+            LAUGH -> ZONE_LAUGH + (1f - ZONE_LAUGH) * (0.1f + 0.85f * frac(jaw, LAUGH_JAW, 0.6f))
+            SMILE -> ZONE_SMILE + (ZONE_LAUGH - ZONE_SMILE) *
+                (0.1f + 0.85f * (0.6f * frac(corners, SMILE_CORNERS, 0.65f) + 0.4f * frac(eyes, SMILE_EYES, 0.45f)))
+            // Boring zone: the needle creeps toward "smile" as the corners rise, but never crosses without smiling eyes.
+            else -> ZONE_SMILE * 0.95f * frac(corners, 0f, SMILE_CORNERS)
+        }
+
+        // ---- Reactions ----
+        val mouthSmile = both("mouthSmile")
         // Mouth pulled to one side / one-sided smile.
         val skeptical = diff("mouthSmile") + abs(d("mouthLeft") - d("mouthRight")) + 0.5f * diff("mouthPress")
         // One eyebrow up, the other not.
@@ -101,16 +152,16 @@ class ReactionDetector {
         // Yawn: jaw wide open without smiling. Droopy eyes: eyelids half-closed for a while (not a blink).
         val yawn = if (mouthSmile < 0.15f) jaw else 0f
         val lids = both("eyeBlink")
-        if (lids > 0.35f && yawn < 0.4f) {
+        if (lids > 0.35f && yawn < 0.4f && level < SMILE) {
             if (droopSince < 0) droopSince = now
         } else {
             droopSince = -1L
         }
         val droopy = droopSince >= 0 && now - droopSince >= DROOP_MS
-        // Anything else that moves the face noticeably.
+        // Anything else that moves the face noticeably, including a teeth-baring grimace.
         val other = maxOf(
-            d("browInnerUp"), both("browOuterUp"), both("browDown"), both("eyeWide"), both("mouthFrown"), both("noseSneer"),
-            d("mouthPucker"), d("mouthFunnel"), d("cheekPuff"), both("mouthStretch"),
+            d("browInnerUp"), both("browOuterUp"), both("browDown"), both("eyeWide"), both("mouthFrown"),
+            both("noseSneer"), d("mouthPucker"), d("mouthFunnel"), d("cheekPuff"), stretch,
         )
 
         // Each score divided by its trigger level: 1.0 or more means "showing". "Other" only wins when nothing specific does.
